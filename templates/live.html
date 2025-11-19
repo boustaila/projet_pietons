@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Camera Detection</title>
+    <style>
+        :root {
+            --background-color: #f4f7f6;
+            --container-bg: #ffffff;
+            --primary-text: #2c3e50;
+            --secondary-text: #5a7184;
+            --accent-color: #e74c3c; /* Bdlna l-color l-7mer (Live) */
+            --accent-hover: #c0392b;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+            --border-radius: 12px;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            font-family: var(--font-main);
+            background-color: var(--background-color);
+            color: var(--primary-text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 { margin: 0; font-size: 2.5rem; }
+        header p { font-size: 1.1rem; color: var(--secondary-text); }
+        header .warning {
+            background: #fdf5e8;
+            color: #d35400;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #f0c47b;
+            font-weight: 600;
+        }
+
+        #start-btn {
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        #start-btn:hover { background-color: var(--accent-hover); }
+        #start-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1600px; /* Kbir bach iban mzyan */
+        }
+        .video-box {
+            background: var(--container-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            height: 60vh; /* 60% mn tola dyal screen */
+            display: flex;
+            flex-direction: column;
+        }
+        .video-box h2 {
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+            text-align: center;
+        }
+        .video-wrapper {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2c3e50;
+            border-radius: 8px;
+            position: relative;
+        }
+        video, img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        #result-frame { display: none; } /* Mkhbia f l-wel */
+        
+        /* Loader */
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid var(--accent-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            display: none; /* Mkhbi f l-wel */
+            position: absolute;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Live Camera Detection</h1>
+        <p class="warning">
+            <strong>Warning:</strong> This demo will be slow and laggy.
+            Detection runs on the server, not in your browser.
+        </p>
+    </header>
+
+    <button id="start-btn">Start Camera</button>
+
+    <div class="container">
+        <div class="video-box">
+            <h2>Live Webcam</h2>
+            <div class="video-wrapper">
+                <video id="webcam" autoplay muted playsinline></video>
+            </div>
+        </div>
+        
+        <div class="video-box">
+            <h2>Detection Result</h2>
+            <div class="video-wrapper">
+                <img id="result-frame" alt="Detection Result">
+                <div class="loader" id="loader"></div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const resultImg = document.getElementById('result-frame');
+        const startBtn = document.getElementById('start-btn');
+        const canvas = document.getElementById('hidden-canvas');
+        const loader = document.getElementById('loader');
+
+        let isDetecting = false; // Bach manbqawech nsifto 1000 request f dqa
+
+        // 1. Melli l-user iklliki 3la "Start Camera"
+        startBtn.onclick = async () => {
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting Camera...';
+
+            try {
+                // Tleb l-camera
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } } 
+                });
+                video.srcObject = stream;
+
+                // Melli l-video ikhdem, bda l-detection
+                video.onplay = () => {
+                    startBtn.textContent = 'Detection Running...';
+                    
+                    // Nqado l-canvas 3la qd l-video
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Bda l-loop dyal l-detection
+                    detectFrameLoop();
+                };
+
+            } catch (err) {
+                console.error("Mochkil f l-camera:", err);
+                startBtn.textContent = 'Camera Error!';
+                startBtn.style.backgroundColor = '#e74c3c';
+            }
+        };
+
+        // 2. L-Loop dyal Detection (L-Khdma l-Kbira)
+        async function detectFrameLoop() {
+            // Ila kant chi detection khdama, tssenaha 7ta tsalii
+            if (isDetecting) {
+                requestAnimationFrame(detectFrameLoop); // 3awed 3iyet l rasso
+                return;
+            }
+
+            isDetecting = true;
+            loader.style.display = 'block'; // Werri l-loader
+
+            // 1. Khod tsswira (frame) mn l-video o 7eṭha f l-canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 2. 7ewwel l-canvas l-image (Blob) bach nsiftoha
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                try {
+                    // 3. Sift l-image l-endpoint "/detect" dyalna
+                    const response = await fetch('/detect', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) throw new Error('Server error');
+
+                    // 4. Khod n-natija (tsswira) o werriha
+                    const resultBlob = await response.blob();
+                    const imgUrl = URL.createObjectURL(resultBlob);
+                    
+                    resultImg.src = imgUrl; // 7et n-natija
+                    resultImg.style.display = 'block'; // Werriha
+
+                } catch (err) {
+                    console.error("Mochkil f l-detection:", err);
+                } finally {
+                    // 5. Melli tsalii, 7iyed l-loader o 3awed l-loop
+                    loader.style.display = 'none';
+                    isDetecting = false;
+                    requestAnimationFrame(detectFrameLoop); // 3iyet l rasso mn jdid
+                }
+            }, 'image/jpeg'); // Format dyal tsswira
+        }
+    </script>
+
+</body>
+</html>
