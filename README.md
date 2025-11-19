@@ -17,13 +17,15 @@ Detect pedestrians live through your webcam using a modern deep learning model (
 
 ---
 
-## 📁 Project Structure
-- `main.py`: Runs the FastAPI server
-- `templates/`: Contains the web UI (index.html)
-- `static/`: Custom CSS for styling
-- `uploads/`: Images uploaded by user
-- `runs/detect/`: Detection result images
-- `models/best.pt`: Trained YOLOv5 weights
+
+## 📂 Project Structure
+```text
+├── models/          # Contains the YOLOv5 weights (best.pt)
+├── static/          # CSS and images
+├── templates/       # HTML files (index.html, live.html)
+├── yolov5/          # YOLOv5 core library
+├── main.py          # Main application logic
+└── requirements.txt # Python dependencies
 
 ---
 
@@ -38,10 +40,12 @@ cd projet_pietons
 ### 2. 📦 Install dependencies
  pip install -r yolov5/requirements.txt
  pip install fastapi uvicorn opencv-python
-### 3. 🚀 Launch the FastAPI server 
- `python main.py`
-### 4. Open browser: 
- `http://localhost:8000`
+
+
+Run the server
+
+uvicorn main:app --reload
+Access the App Open your browser at http://127.0.0.1:8000
 
  **Ameed Boustaila**  
 Email: boustailaahmed014@gmail.com
