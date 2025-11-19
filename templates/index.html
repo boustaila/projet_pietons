@@ -1,50 +1,309 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Détection des Piétons - YOLOv5</title>
-    <link rel="stylesheet" href="C:\Users\Ameed\yolo_fastapi_project\static\style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv5 Pedestrian Detection</title>
+    <style>
+        /* --- Root Variables (Colors & Fonts) --- */
+        :root {
+            --background-color: #f4f7f6;
+            --container-bg: #ffffff;
+            --primary-text: #2c3e50;
+            --secondary-text: #5a7184;
+            --accent-color: #3498db;
+            --accent-hover: #2980b9;
+            --danger-color: #e74c3c;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+            --border-radius: 12px;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--background-color);
+            color: var(--primary-text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        header p {
+            font-size: 1.1rem;
+            color: var(--secondary-text);
+        }
+
+        /* --- Main Content Area --- */
+        main {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- Control Panel (Upload) --- */
+        .controls {
+            background: var(--container-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Custom File Upload Button */
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-input-btn {
+            background-color: #ecf0f1;
+            color: var(--secondary-text);
+            border: 2px dashed #bdc3c7;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .file-input-wrapper:hover .file-input-btn {
+            background-color: #e8f6fd;
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+        
+        #file-name {
+            color: var(--secondary-text);
+            font-style: italic;
+            flex-grow: 1;
+        }
+
+        /* Detect Button */
+        #detect-btn {
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #detect-btn:hover {
+            background-color: var(--accent-hover);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+        }
+        #detect-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* --- Image Results Area --- */
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .image-box {
+            background: var(--container-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px; /* Bghitihom ikono kbar */
+            height: 60vh; /* Kakhdo 60% mn tola dyal screen */
+        }
+        
+        .image-box h2 {
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 100%; /* Hada howa l-mohim bach tsswira tkbar */
+            object-fit: contain; /* Kat7afed 3la dimensions dyal tsswira */
+            border-radius: 8px;
+            display: none; /* Kan-khbiwha 7ta t-uploada */
+        }
+        
+        .placeholder {
+            color: #bdc3c7;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        /* --- Loader (Spinner) --- */
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid var(--accent-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            display: none; /* Mkhbi f l-wel */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚶‍♂️ Détection de Piétons avec YOLOv5</h1>
-        <form action="/detect" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="image/*" required>
-            <button type="submit" >📷 Lancer la détection</button>
-        </form>
-        <p>Après soumission, l'image avec les piétons détectés s'affichera automatiquement.</p>
-    </div>
+
+    <header>
+        <h1>Pedestrian Detection Service</h1>
+        <p>Upload an image to detect pedestrians using YOLOv5</p>
+    </header>
+
+    <main>
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <button class="file-input-btn">Choose an Image</button>
+                <input id="file-input" type="file" accept="image/*">
+            </div>
+            <span id="file-name">No file selected</span>
+            <button id="detect-btn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                <span>Detect</span>
+            </button>
+        </div>
+
+        <div class="results-container">
+            <div class="image-box">
+                <h2>Original Image</h2>
+                <img id="original-image" src="#" alt="Original Upload">
+                <span class="placeholder" id="original-placeholder">Waiting for image...</span>
+            </div>
+            
+            <div class="image-box">
+                <h2>Detection Result</h2>
+                <img id="result-image" src="#" alt="Detection Result">
+                <span class="placeholder" id="result-placeholder">Waiting for detection...</span>
+                <div class="loader" id="loader"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Get elements
+        const fileInput = document.getElementById('file-input');
+        const fileName = document.getElementById('file-name');
+        const detectBtn = document.getElementById('detect-btn');
+        
+        const originalImage = document.getElementById('original-image');
+        const originalPlaceholder = document.getElementById('original-placeholder');
+        
+        const resultImage = document.getElementById('result-image');
+        const resultPlaceholder = document.getElementById('result-placeholder');
+        const loader = document.getElementById('loader');
+
+        let uploadedFile = null;
+
+        // 1. Melli l-user ikhtar fichier
+        fileInput.onchange = () => {
+            if (fileInput.files.length > 0) {
+                uploadedFile = fileInput.files[0];
+                fileName.textContent = uploadedFile.name; // Nwerriw smiya dyal tsswira
+                
+                // Nwerriw tsswira l-originalia o nkbroha
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImage.src = e.target.result;
+                    originalImage.style.display = 'block'; // Biyen l-image
+                    originalPlaceholder.style.display = 'none'; // Khbi l-placeholder
+                };
+                reader.readAsDataURL(uploadedFile);
+
+                detectBtn.disabled = false; // N-activiw l-button "Detect"
+                
+                // Nkhbiw n-natija l-qdima ila kant
+                resultImage.style.display = 'none';
+                resultPlaceholder.style.display = 'block';
+                loader.style.display = 'none';
+            }
+        };
+
+        // 2. Melli l-user iklliki 3la "Detect"
+        detectBtn.onclick = async () => {
+            if (!uploadedFile) return;
+
+            // Nkhbiw natija qdima o nwerriw l-loader
+            resultImage.style.display = 'none';
+            resultPlaceholder.style.display = 'none';
+            loader.style.display = 'block';
+            detectBtn.disabled = true; // N-desactiviw l-button bach may3awedch iklliki
+
+            // Nqado FormData
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+
+            try {
+                // Nsifto l-request l-backend
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                // Nchdo n-natija (li hia tsswira)
+                const imageBlob = await response.blob();
+                const imageUrl = URL.createObjectURL(imageBlob);
+
+                // Nwerriw n-natija l-kbira
+                resultImage.src = imageUrl;
+                resultImage.style.display = 'block'; // Biyen n-natija
+
+            } catch (error) {
+                console.error('Error during detection:', error);
+                resultPlaceholder.textContent = `Error: ${error.message}. Please try again.`;
+                resultPlaceholder.style.display = 'block';
+                resultPlaceholder.style.color = 'var(--danger-color)';
+            } finally {
+                // F ga3 l-7alat, n7bso l-loader o n-activiw l-button
+                loader.style.display = 'none';
+                detectBtn.disabled = false;
+            }
+        };
+    </script>
+
 </body>
-<style>
-
-    body {
-    font-family: Arial, sans-serif;
-    background-color: #b0cbd8;
-    text-align: center;
-    padding: 40px;
-}
-.container {
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    max-width: 500px;
-    margin: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-h1 {
-    margin-bottom: 20px;
-}
-button {
-    padding: 10px 20px;
-    font-size: 16px;
-    background: #71ff92;
-    color: white;
-    border: none;
-    border-radius: 5px;
-}
-input[type=\"file\"] {
-    margin: 20px 0;
-}
-
-</style>
 </html>
